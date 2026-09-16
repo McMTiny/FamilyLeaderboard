@@ -154,13 +154,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sy
 // step-by-step. Until you do, the app just runs locally per device.
 // ═══════════════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyA8Zuc8RdWqz1FoLbUiotAN_Ju6x1Cs00E",
-  authDomain: "familyleaderboard-9cb7a.firebaseapp.com",
-  databaseURL: "https://familyleaderboard-9cb7a-default-rtdb.firebaseio.com",
-  projectId: "familyleaderboard-9cb7a",
-  storageBucket: "familyleaderboard-9cb7a.firebasestorage.app",
-  messagingSenderId: "779705614845",
-  appId: "1:779705614845:web:38dcdd6a12374b2e6a1994"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
 };
 
 const STORAGE_KEY='gnt_v2';
@@ -183,10 +180,19 @@ if(!new URLSearchParams(location.search).get('room')){
   history.replaceState({},'',u);
 }
 
-let state = (()=>{
+function sanitizeState(obj){
+  if(!obj || typeof obj !== 'object') return { players:[], games:[], sessions:[] };
+  return {
+    players: Array.isArray(obj.players) ? obj.players : [],
+    games: Array.isArray(obj.games) ? obj.games : [],
+    sessions: Array.isArray(obj.sessions) ? obj.sessions : []
+  };
+}
+
+let state = sanitizeState((()=>{
   try{ const r=localStorage.getItem(STORAGE_KEY); if(r) return JSON.parse(r); }catch(e){}
   return { players:['Alice','Bob','Charlie','Diana'], games:['Poker','Mahjong','Uno'], sessions:[] };
-})();
+})());
 
 let fbRef=null, applyingRemote=false, syncEnabled=false;
 
@@ -199,10 +205,10 @@ function initFirebase(){
       const remote=snap.val();
       if(remote){
         applyingRemote=true;
-        state=remote;
+        state=sanitizeState(remote);
         localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
         applyingRemote=false;
-        render();
+        try{ render(); }catch(e){ console.error('Render error after sync:', e); }
       } else {
         fbRef.set(state);
       }
@@ -574,7 +580,13 @@ function toast(msg){
   setTimeout(()=>el.classList.remove('show'),2200);
 }
 
+try {
 render();
+} catch(e) {
+  console.error('Initial render failed:', e);
+  const c = document.getElementById('content');
+  if (c) c.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Something went wrong loading saved data.<br>Go to Settings → Clear sessions, or clear this site\'s data in your browser, then reload.</p></div>';
+}
 setSyncBadge(false);
 initFirebase();
 </script>
