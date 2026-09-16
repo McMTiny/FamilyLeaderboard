@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Game Night">
@@ -20,8 +20,8 @@
   --shadow:0 2px 12px rgba(11,61,46,.10); --tabh:64px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--surf2);color:var(--txt);overscroll-behavior:none}
-#app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;position:relative;background:var(--surf2)}
+html,body{height:100dvh;height:100%;width:100%;overflow-x:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--surf2);color:var(--txt);overscroll-behavior:none}
+#app{display:flex;flex-direction:column;height:100dvh;height:100%;width:100%;max-width:480px;margin:0 auto;position:relative;background:var(--surf2);overflow-x:hidden}
 #hdr{background:var(--felt);color:#fff;padding:env(safe-area-inset-top,12px) 16px 12px;display:flex;align-items:center;justify-content:space-between;min-height:56px}
 #hdr h1{font-size:18px;font-weight:700;letter-spacing:-.3px}
 #hdr .sub{font-size:11px;opacity:.65;margin-top:1px}
@@ -103,7 +103,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sy
 .p-row.only{border-radius:12px}
 .del-btn{width:28px;height:28px;border-radius:50%;background:var(--loss);border:none;color:var(--loss-tx);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .add-row{display:flex;gap:8px;margin-top:8px}
-.add-row input{flex:1;height:42px;border:1.5px solid var(--bdr);border-radius:8px;padding:0 12px;font-size:15px;color:var(--txt);background:var(--surf);outline:none}
+.add-row input{flex:1;min-width:0;height:42px;border:1.5px solid var(--bdr);border-radius:8px;padding:0 12px;font-size:15px;color:var(--txt);background:var(--surf);outline:none}
 .add-row input:focus{border-color:var(--felt2)}
 .add-btn{height:42px;padding:0 16px;border-radius:8px;background:var(--felt);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
 /* Empty */
@@ -196,6 +196,7 @@ let state = sanitizeState((()=>{
   try{ const r=localStorage.getItem(STORAGE_KEY); if(r) return JSON.parse(r); }catch(e){}
   return { players:['Alice','Bob','Charlie','Diana'], games:['Poker','Mahjong','Uno'], sessions:[] };
 })());
+if(ensureIds()) localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
 
 let fbRef=null, applyingRemote=false, syncEnabled=false;
 
@@ -209,6 +210,7 @@ function initFirebase(){
       if(remote){
         applyingRemote=true;
         state=sanitizeState(remote);
+        ensureIds();
         localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
         applyingRemote=false;
         try{ render(); }catch(e){ console.error('Render error after sync:', e); }
@@ -228,7 +230,18 @@ function setSyncBadge(live){
   else { dot.style.background='#8a8a8a'; label.textContent='Local only'; }
 }
 
-let currentTab='leaderboard', activeGame=null;
+let currentTab='leaderboard', activeGame=null, editingId=null;
+const EDIT_WINDOW_MS = 5*60*1000; // entries lock 5 minutes after logging
+
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function isEditable(s){ return (Date.now() - new Date(s.date).getTime()) < EDIT_WINDOW_MS; }
+
+function ensureIds(){
+  let changed=false;
+  state.sessions.forEach(s=>{ if(!s.id){ s.id=genId(); changed=true; } });
+  return changed;
+}
 let form={ game:'', player:'', amtIn:0, amtOut:0, gifted:0, result:'', sessionNum:1 };
 
 function save(localOnly){
@@ -373,7 +386,7 @@ function rLog(){
   }).join('');
   return `<div style="height:12px"></div>
   <div class="form-card">
-    <div class="form-title">🎮 Log a game result</div>
+    <div class="form-title">${editingId?'✏️ Edit game result':'🎮 Log a game result'}</div>
     <div class="field"><label>Game</label><select id="f-game"><option value="">Select game…</option>${gOpts}</select></div>
     <div class="field"><label>Player</label><select id="f-player"><option value="">Select player…</option>${pOpts}</select></div>
     <div class="field"><label>Session #</label><input id="f-sess" type="number" min="1" value="${form.sessionNum}" placeholder="1"></div>
@@ -389,7 +402,8 @@ function rLog(){
         <button class="res-btn tie ${form.result==='Tie'?'sel':''}" onclick="setResult('Tie')">🤝 Tie</button>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="submitLog()">Save Result</button>
+    <button class="btn btn-primary" onclick="submitLog()">${editingId?'Update Result':'Save Result'}</button>
+    ${editingId?`<button class="btn" style="background:var(--surf2);color:var(--txt2);margin-top:8px" onclick="cancelEdit()">Cancel Edit</button>`:''}
   </div>
   ${recent?`<div style="padding:0 16px 8px"><div style="font-size:13px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Recent</div><div class="card">${recent}</div></div>`:''}
   <div style="height:12px"></div>`;
@@ -407,9 +421,17 @@ function rHistory(){
     const rows=sessions.map(s=>{
       const net=(s.amtOut-s.amtIn)+((s.potWon||0)-(s.gifted||0));
       const cc=s.result==='Win'?'win':s.result==='Loss'?'loss':'tie';
+      const editable=isEditable(s);
+      const actions=editable
+        ? `<div style="display:flex;gap:14px;margin-top:6px">
+             <button style="border:none;background:none;color:var(--felt2);font-size:11px;font-weight:700;cursor:pointer;padding:0" onclick="editSession('${s.id}')">Edit</button>
+             <button style="border:none;background:none;color:var(--loss-tx);font-size:11px;font-weight:700;cursor:pointer;padding:0" onclick="deleteSession('${s.id}')">Delete</button>
+           </div>`
+        : `<div style="font-size:10px;color:#aab0aa;margin-top:6px">🔒 Locked — editable for 5 min after logging</div>`;
       return `<div class="h-row">
         <div class="h-top"><div class="h-player">${s.player} <span class="chip ${cc}">${s.result}</span></div><div class="h-net ${net>0?'pos':net<0?'neg':''}">${fmt(net)}</div></div>
         <div class="h-meta">${s.game} · Sess ${s.sessionNum||1} · In ${fmt(s.amtIn||0)} · Out ${fmt(s.amtOut||0)} · Gifted ${fmt(s.gifted||0)} · Pot Won ${fmt(s.potWon||0)}</div>
+        ${actions}
       </div>`;
     }).join('');
     return `<div style="padding:0 16px 8px"><div style="font-size:13px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">${date}</div><div class="card">${rows}</div></div>`;
@@ -529,10 +551,50 @@ function submitLog(){
   if(!game){ toast('Select a game'); return; }
   if(!player){ toast('Select a player'); return; }
   if(!result){ toast('Select Win / Loss / Tie'); return; }
-  state.sessions.push({date:new Date().toISOString(),game,player,sessionNum,amtIn,amtOut,gifted,potWon:0,result});
+
+  if(editingId){
+    const idx=state.sessions.findIndex(x=>x.id===editingId);
+    if(idx===-1){ toast('Entry not found — it may have been deleted'); editingId=null; nav('history'); return; }
+    if(!isEditable(state.sessions[idx])){ toast('Editing window has expired'); editingId=null; nav('history'); return; }
+    state.sessions[idx]={...state.sessions[idx],game,player,sessionNum,amtIn,amtOut,gifted,result};
+    recalcPots(); save();
+    editingId=null;
+    form={game:'',player:'',amtIn:0,amtOut:0,gifted:0,result:'',sessionNum:1};
+    toast('Result updated!');
+    nav('history');
+    return;
+  }
+
+  state.sessions.push({id:genId(),date:new Date().toISOString(),game,player,sessionNum,amtIn,amtOut,gifted,potWon:0,result});
   recalcPots(); save();
   form={game,player:'',amtIn:0,amtOut:0,gifted:0,result:'',sessionNum};
   toast('Result saved!'); render();
+}
+
+function editSession(id){
+  const s=state.sessions.find(x=>x.id===id);
+  if(!s){ toast('Entry not found'); return; }
+  if(!isEditable(s)){ toast('Editing window has expired'); render(); return; }
+  editingId=id;
+  form={game:s.game,player:s.player,amtIn:s.amtIn,amtOut:s.amtOut,gifted:s.gifted,result:s.result,sessionNum:s.sessionNum||1};
+  nav('log');
+}
+
+function deleteSession(id){
+  const s=state.sessions.find(x=>x.id===id);
+  if(!s){ toast('Entry not found'); return; }
+  if(!isEditable(s)){ toast('Editing window has expired'); render(); return; }
+  if(!confirm('Delete this entry? This cannot be undone.')) return;
+  state.sessions=state.sessions.filter(x=>x.id!==id);
+  recalcPots(); save();
+  toast('Entry deleted');
+  render();
+}
+
+function cancelEdit(){
+  editingId=null;
+  form={game:'',player:'',amtIn:0,amtOut:0,gifted:0,result:'',sessionNum:1};
+  nav('history');
 }
 
 function addPlayer(){
@@ -592,6 +654,9 @@ render();
 }
 setSyncBadge(false);
 initFirebase();
+
+// keep the 5-minute edit lock accurate without requiring a manual refresh
+setInterval(()=>{ if(currentTab==='history') render(); }, 30000);
 </script>
 </body>
 </html>
