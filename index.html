@@ -141,6 +141,9 @@ html,body{height:100dvh;height:100%;width:100%;overflow-x:hidden;font-family:-ap
     <button class="tab" data-tab="bygame" onclick="nav('bygame')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="9" height="9"/><rect x="13" y="2" width="9" height="9"/><rect x="2" y="13" width="9" height="9"/><rect x="13" y="13" width="9" height="9"/></svg>By Game
     </button>
+    <button class="tab" data-tab="profile" onclick="nav('profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Profile
+    </button>
     <button class="tab" data-tab="settings" onclick="nav('settings')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings
     </button>
@@ -154,13 +157,10 @@ html,body{height:100dvh;height:100%;width:100%;overflow-x:hidden;font-family:-ap
 // step-by-step. Until you do, the app just runs locally per device.
 // ═══════════════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyA8Zuc8RdWqz1FoLbUiotAN_Ju6x1Cs00E",
-  authDomain: "familyleaderboard-9cb7a.firebaseapp.com",
-  databaseURL: "https://familyleaderboard-9cb7a-default-rtdb.firebaseio.com",
-  projectId: "familyleaderboard-9cb7a",
-  storageBucket: "familyleaderboard-9cb7a.firebasestorage.app",
-  messagingSenderId: "779705614845",
-  appId: "1:779705614845:web:38dcdd6a12374b2e6a1994"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
 };
 
 const STORAGE_KEY='gnt_v2';
@@ -282,7 +282,7 @@ function computeLB(){
     const totalOut=rows.reduce((a,r)=>a+(r.amtOut||0),0);
     const totalGifted=rows.reduce((a,r)=>a+(r.gifted||0),0);
     const totalPotWon=rows.reduce((a,r)=>a+(r.potWon||0),0);
-    const net=(totalOut-totalIn)+(totalPotWon-totalGifted);
+    const net=(totalOut-totalIn)+totalPotWon; // gifting isn't a loss — only your own buy-in/cash-out and any pot you win count
     const giftsGiven=rows.filter(r=>(r.gifted||0)>0).length;
     const smoothed=(wins+1)/(played+2);
     return{player,idx,wins,losses,ties,played,totalIn,totalOut,totalGifted,totalPotWon,net,giftsGiven,smoothed};
@@ -307,9 +307,9 @@ function render(){
   const sub=document.getElementById('hdr-sub');
   const badge=document.getElementById('badge');
   badge.textContent=state.sessions.length?state.sessions.length+' entries':'';
-  const subs={leaderboard:'Live standings',log:'Add a result',history:'All sessions',bygame:'Game breakdown',settings:'Players & games'};
+  const subs={leaderboard:'Live standings',log:'Add a result',history:'All sessions',bygame:'Game breakdown',profile:'Player profiles',settings:'Players & games'};
   sub.textContent=subs[currentTab]||'';
-  const fns={leaderboard:rLeaderboard,log:rLog,history:rHistory,bygame:rByGame,settings:rSettings};
+  const fns={leaderboard:rLeaderboard,log:rLog,history:rHistory,bygame:rByGame,profile:rProfile,settings:rSettings};
   el.innerHTML=(fns[currentTab]||rLeaderboard)();
   if(currentTab==='log') bindLog();
   if(currentTab==='bygame') bindGameTabs();
@@ -377,7 +377,7 @@ function rLog(){
   const gOpts=state.games.map(g=>`<option value="${g}" ${form.game===g?'selected':''}>${g}</option>`).join('');
   const pOpts=state.players.map(p=>`<option value="${p}" ${form.player===p?'selected':''}>${p}</option>`).join('');
   const recent=state.sessions.slice(-5).reverse().map(s=>{
-    const net=(s.amtOut-s.amtIn)+((s.potWon||0)-(s.gifted||0));
+    const net=(s.amtOut-s.amtIn)+(s.potWon||0);
     const cc=s.result==='Win'?'win':s.result==='Loss'?'loss':'tie';
     return `<div class="h-row">
       <div class="h-top"><div class="h-player">${s.player} <span class="chip ${cc}">${s.result}</span></div><div class="h-net ${net>0?'pos':net<0?'neg':''}">${fmt(net)}</div></div>
@@ -419,7 +419,7 @@ function rHistory(){
   });
   return '<div style="height:12px"></div>'+Object.entries(byDate).map(([date,sessions])=>{
     const rows=sessions.map(s=>{
-      const net=(s.amtOut-s.amtIn)+((s.potWon||0)-(s.gifted||0));
+      const net=(s.amtOut-s.amtIn)+(s.potWon||0);
       const cc=s.result==='Win'?'win':s.result==='Loss'?'loss':'tie';
       const editable=isEditable(s);
       const actions=editable
@@ -447,7 +447,7 @@ function rByGame(){
     const wins=r.filter(x=>x.result==='Win').length;
     const losses=r.filter(x=>x.result==='Loss').length;
     const ties=r.filter(x=>x.result==='Tie').length;
-    const net=r.reduce((a,x)=>a+((x.amtOut-x.amtIn)+((x.potWon||0)-(x.gifted||0))),0);
+    const net=r.reduce((a,x)=>a+((x.amtOut-x.amtIn)+(x.potWon||0)),0);
     const cls=r.length?(net>0?'positive':net<0?'negative':''):'';
     return `<div class="bg-row ${cls}">
       <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
@@ -463,6 +463,38 @@ function rByGame(){
   return `<div style="height:12px"></div>
   <div class="gtab-row">${tabs}</div>
   <div style="padding:0 16px 12px"><div class="card">${rows}</div></div>
+  <div style="height:12px"></div>`;
+}
+
+function rProfile(){
+  if(!state.players.length) return '<div class="empty"><div class="empty-icon">🙍</div><p>Add players in Settings</p></div>';
+  const lb=computeLB();
+  const groupTotal=lb.reduce((a,p)=>a+p.totalGifted,0);
+  const maxGifted=Math.max(0,...lb.map(p=>p.totalGifted));
+  const byGifted=[...lb].sort((a,b)=>b.totalGifted-a.totalGifted);
+  const rows=byGifted.map(p=>{
+    const isTopGifter=p.totalGifted>0 && p.totalGifted===maxGifted;
+    return `<div class="card" style="margin:0 16px 10px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+      ${av(p.player,p.idx)}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span>${p.player}</span>
+          ${isTopGifter?'<span style="font-size:11px;background:var(--gold-lt);color:#7a5d00;padding:1px 8px;border-radius:20px;font-weight:700;white-space:nowrap">🎁 Top Gifter</span>':''}
+        </div>
+        <div style="font-size:11px;color:var(--txt2);margin-top:2px">${p.wins}W · ${p.losses}L · ${p.ties}T · ${p.played} played · ${p.giftsGiven} gift${p.giftsGiven===1?'':'s'} given</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;color:var(--txt2)">Gifted</div>
+        <div style="font-size:18px;font-weight:700;color:#8E7CC3">${fmt(p.totalGifted)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="height:12px"></div>
+  <div style="padding:0 16px 12px;text-align:center">
+    <div style="font-size:11px;color:var(--txt2)">Total gifted across the group</div>
+    <div style="font-size:24px;font-weight:700;color:#8E7CC3">${fmt(groupTotal)}</div>
+  </div>
+  ${rows}
   <div style="height:12px"></div>`;
 }
 
